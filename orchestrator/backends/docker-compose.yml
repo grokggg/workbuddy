@@ -1,0 +1,11 @@
+services:
+  up-tools:
+    build:
+      context: ../..
+      dockerfile: orchestrator/backends/Dockerfile
+    image: up-tools:latest
+    volumes:
+      - ../../real-binaries:/workspace/real-binaries
+      - ../../dynamic-crackmes:/workspace/dynamic-crackmes
+      - ./out:/workspace/out
+    command: ["real-binaries/crackme-angr", "--out", "/workspace/out"]

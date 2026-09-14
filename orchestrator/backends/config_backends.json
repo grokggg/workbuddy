@@ -1,0 +1,23 @@
+{
+  "priority": ["gitlab", "github", "docker", "oracle"],
+  "gitlab": {
+    "project_id": "370403",
+    "host": "https://jihulab.com",
+    "token_env": "GITLAB_TOKEN",
+    "max_pipelines_per_month": 400
+  },
+  "github": {
+    "repo": "grokggg/workbuddy",
+    "token_env": "GITHUB_TOKEN",
+    "max_minutes_per_month": 2000
+  },
+  "docker": {
+    "image": "up-tools:latest",
+    "local": true
+  },
+  "oracle": {
+    "host": "",
+    "key_env": "ORACLE_SSH_KEY",
+    "user": "ubuntu"
+  }
+}
