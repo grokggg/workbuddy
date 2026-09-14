@@ -1,52 +1,54 @@
-# .gitlab-ci.yml —— 极狐 GitLab CI 多格式分派(M36)
-# 上传即处理: inbox/ 目录 push 自动触发
+# .gitlab-ci.yml —— M37 优化版
+# 优化点:
+#   1. 缓存 pip 依赖(跨 pipeline 复用, 省安装时间)
+#   2. 单 job 串行(避免多 job 重复装依赖)
+#   3. pip install 只装轻量库(极狐 runner 装 angr 超时)
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+  GIT_DEPTH: "20"
+
+cache:
+  key: "$CI_JOB_NAME"
+  paths:
+    - .pip-cache/
+  policy: pull-push
 
 stages:
-  - process
-  - llm
-  - package
+  - analyze
+  - report
 
-process:
-  stage: process
+analyze:
+  stage: analyze
   image: python:3.12
   script:
-    - "pip install --quiet capstone pyelftools pefile > /dev/null 2>&1 || true"
+    - "echo '=== [1] 依赖(缓存命中则秒装) ==='"
+    - "pip install --quiet --cache-dir $PIP_CACHE_DIR capstone pyelftools pefile || pip install --quiet capstone pyelftools pefile"
+    - "python3 -c \"import capstone, elftools, pefile; print('deps OK')\""
     - "TARGET=$(ls inbox/* 2>/dev/null | head -1 || echo real-binaries/crackme-angr)"
-    - "echo '目标: '$TARGET"
-    - "python3 -c 'import sys; d=open(sys.argv[1],\"rb\").read(16); f=\"ELF\" if d[:4]==b\"\\x7fELF\" else (\"PE\" if d[:2]==b\"MZ\" else \"OTHER\"); print(\"格式: \"+f)' \"$TARGET\""
+    - "echo \"目标: $TARGET\""
     - "mkdir -p /tmp/out"
+    - "echo '=== [2] 统一分析 ==='"
     - "python3 unified-analysis/analysis_all.py \"$TARGET\" --out /tmp/out --json > /tmp/report.json || true"
-    - "echo '=== 分析报告 ==='"
-    - "head -15 /tmp/report.json 2>/dev/null || true"
+    - "echo '=== [3] 结果 ==='"
+    - "head -12 /tmp/report.json 2>/dev/null || true"
+    - "ls /tmp/out/ 2>/dev/null || echo '无破解产物'"
     - "echo '# 极狐CI分析报告' > /tmp/report.md"
     - "cat /tmp/report.json >> /tmp/report.md 2>/dev/null || true"
-    - "echo '=== 破解产物 ==='"
-    - "ls -la /tmp/out/ 2>/dev/null || echo '无破解产物'"
   artifacts:
     paths:
       - /tmp/report.md
-    expire_in: 7 days
+    expire_in: 3 days
     when: always
 
-llm:
-  stage: llm
-  image: python:3.12
-  needs: ["process"]
-  script:
-    - "pip install --quiet capstone pyelftools > /dev/null 2>&1 || true"
-    - "TARGET=$(ls inbox/* 2>/dev/null | head -1 || echo real-binaries/crackme-angr)"
-    - "echo '=== LLM 策略(降级规则版) ==='"
-    - "python3 lib/llm_engine.py \"$TARGET\" 2>&1 | head -10 || true"
-
-package:
-  stage: package
+report:
+  stage: report
   image: alpine:3.19
-  needs: ["llm"]
+  needs: ["analyze"]
   script:
-    - "echo '=== 完成 ==='"
-    - "ls /tmp/report.md 2>/dev/null || true"
+    - "echo '=== pipeline 完成 ==='"
   artifacts:
     paths:
       - /tmp/report.md
-    expire_in: 7 days
+    expire_in: 3 days
     when: always

@@ -37,7 +37,9 @@ def asar_extract(path: str, out_dir: str) -> dict:
             if "files" in info:
                 walk(info, rel)
             else:
-                off = data_start + info.get("offset", 0)
+                # 真实 asar 的 offset 是十进制字符串, 转 int
+                off_str = info.get("offset", 0)
+                off = int(off_str) if not isinstance(off_str, int) else off_str
                 size = info.get("size", 0)
                 files.append({"path": rel, "offset": off, "size": size})
 
