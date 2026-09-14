@@ -1,30 +1,19 @@
 # .gitlab-ci.yml —— 极狐 GitLab CI(计算后端)
-# 沙箱受限时, pipeline 在 GitLab Runner 上运行完整分析
 
 stages:
   - analyze
-  - report
 
 analyze:
   stage: analyze
   image: python:3.12
   script:
-    - apt-get update && apt-get install -y -qq gcc gdb binutils file > /dev/null
-    - pip install --quiet capstone pyelftools pefile
-    - cd up-tools
-    - python3 unified-analysis/analysis_all.py real-binaries/crackme-angr --out /tmp/out --json > /tmp/report.json || true
-    - echo "=== 分析报告 ==="
-    - head -30 /tmp/report.json || true
+    - "apt-get update -qq"
+    - "apt-get install -y -qq gcc gdb binutils"
+    - "pip install --quiet capstone pyelftools pefile"
+    - "cd up-tools"
+    - "python3 -c \"import capstone, elftools, pefile; print('deps OK')\""
   artifacts:
     paths:
-      - /tmp/report.json
+      - up-tools/*.md
     expire_in: 7 days
     when: always
-
-report:
-  stage: report
-  image: alpine:3.19
-  script:
-    - echo "Pipeline 完成: $CI_PIPELINE_ID"
-    - echo "Runner: $CI_RUNNER_DESCRIPTION"
-  needs: [analyze]
