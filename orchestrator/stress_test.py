@@ -19,7 +19,12 @@ from trigger_upload import upload_target, get_latest_pipeline  # noqa: E402
 TOKEN = os.environ.get("GITLAB_TOKEN", "")
 HOST = os.environ.get("GITLAB_HOST", "https://jihulab.com")
 PID = os.environ.get("GITLAB_PROJECT_ID", "370403")
-REPO_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+# REPO_DIR: 优先当前工作目录(在仓库内跑), 否则从脚本位置推断
+REPO_DIR = os.getcwd()
+if not os.path.exists(os.path.join(REPO_DIR, "real-binaries")):
+    REPO_DIR = os.path.abspath(os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+print(f"REPO_DIR: {REPO_DIR}")
 
 TARGETS = [
     ("real-binaries/crackme-angr", "真实 ELF crackme"),

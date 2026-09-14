@@ -27,7 +27,9 @@ REPO = os.environ.get("GITLAB_REPO", "Grantgust123/up-tools")
 PROJECT_ID = os.environ.get("GITLAB_PROJECT_ID", "370403")
 HOST = os.environ.get("GITLAB_HOST", "https://jihulab.com")
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO_DIR = os.path.abspath(os.path.join(HERE, "..", ".."))
+REPO_DIR = os.getcwd()
+if not os.path.exists(os.path.join(REPO_DIR, "inbox")):
+    REPO_DIR = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 
 def upload_target(target: str) -> str:
