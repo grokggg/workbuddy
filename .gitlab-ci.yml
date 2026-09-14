@@ -10,7 +10,7 @@ analyze:
   script:
     # ---- stage 1: 安装依赖 ----
     - "echo '=== [1/8] 安装依赖 ==='"
-    - "pip install --quiet capstone pyelftools pefile angr unicorn 2>/dev/null || pip install --quiet capstone pyelftools pefile"
+    - "pip install --quiet capstone pyelftools pefile"
     - "python3 -c \"import capstone, elftools, pefile; print('deps OK')\""
 
     # ---- stage 2: 格式识别 ----
