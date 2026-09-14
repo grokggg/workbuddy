@@ -1,0 +1,111 @@
+{
+  "size": 9932224,
+  "format": {
+    "file_type": "ELF",
+    "arch": "x64",
+    "kind": "DYN(共享库/动态)"
+  },
+  "packer": {
+    "packed": false,
+    "markers": [],
+    "entropy_suspicious": false,
+    "import_anomaly": true,
+    "entropy_avg": 2.38,
+    "verdict": "未见壳特征"
+  },
+  "antidebug": {
+    "detected": []
+  },
+  "antivm": {
+    "detected": [
+      "CPUID 指令",
+      "RDTSCP(时间差)"
+    ]
+  },
+  "integrity": {
+    "detected": [
+      "字符串:checksum",
+      "字符串:sha1",
+      "字符串:sha256"
+    ]
+  },
+  "anti_repack": {
+    "detected": [
+      "字符串:asar"
+    ]
+  },
+  "imports": {
+    "apis": []
+  },
+  "entropy": {
+    "chunks": [
+      {
+        "offset": 0,
+        "entropy": 1.49
+      },
+      {
+        "offset": 4096,
+        "entropy": 1.14
+      },
+      {
+        "offset": 8192,
+        "entropy": 1.91
+      },
+      {
+        "offset": 12288,
+        "entropy": 4.98
+      },
+      {
+        "offset": 16384,
+        "entropy": 4.21
+      },
+      {
+        "offset": 20480,
+        "entropy": 2.19
+      },
+      {
+        "offset": 24576,
+        "entropy": 2.16
+      },
+      {
+        "offset": 28672,
+        "entropy": 2.38
+      },
+      {
+        "offset": 32768,
+        "entropy": 2.18
+      },
+      {
+        "offset": 36864,
+        "entropy": 2.17
+      },
+      {
+        "offset": 40960,
+        "entropy": 2.17
+      },
+      {
+        "offset": 45056,
+        "entropy": 2.18
+      },
+      {
+        "offset": 49152,
+        "entropy": 2.16
+      },
+      {
+        "offset": 53248,
+        "entropy": 2.22
+      },
+      {
+        "offset": 57344,
+        "entropy": 2.26
+      },
+      {
+        "offset": 61440,
+        "entropy": 2.33
+      }
+    ],
+    "high_entropy_count": 0,
+    "avg_entropy": 2.38,
+    "suspicious": false
+  }
+}
