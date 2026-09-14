@@ -7,13 +7,13 @@ analyze:
   stage: analyze
   image: python:3.12
   script:
-    - "apt-get update -qq"
-    - "apt-get install -y -qq gcc gdb binutils"
     - "pip install --quiet capstone pyelftools pefile"
     - "cd up-tools"
     - "python3 -c \"import capstone, elftools, pefile; print('deps OK')\""
+    - "python3 unified-analysis/analysis_all.py real-binaries/crackme-angr --out /tmp/out --json > /tmp/report.json || true"
+    - "head -20 /tmp/report.json || true"
   artifacts:
     paths:
-      - up-tools/*.md
+      - /tmp/report.json
     expire_in: 7 days
     when: always
