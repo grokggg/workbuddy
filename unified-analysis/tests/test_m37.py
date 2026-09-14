@@ -24,9 +24,11 @@ def make_real_asar(path: str) -> None:
     hj = json.dumps(header, separators=(",", ":")).encode()
     pad = (4 - len(hj) % 4) % 4
     hj += b"\x00" * pad
+    # 真实 asar: header_size 含 16 字节头 + json + padding
+    header_size = 16 + len(hj)
     with open(path, "wb") as f:
         f.write(struct.pack("<I", 4))
-        f.write(struct.pack("<I", len(hj)))
+        f.write(struct.pack("<I", header_size))
         f.write(struct.pack("<I", len(hj)))
         f.write(struct.pack("<I", len(files["main.js"])))
         f.write(hj)

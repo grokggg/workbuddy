@@ -28,7 +28,13 @@ def asar_extract(path: str, out_dir: str) -> dict:
     end = raw.rfind(b"}")
     header = json.loads(raw[:end + 1].decode())
     header_size = struct.unpack("<I", d[4:8])[0]
-    data_start = 16 + header_size
+    # 数据起点兼容两种格式:
+    #   M23 自建: hsize==jsize(不含16头), data_start = 16 + hsize
+    #   真实 asar: hsize 含 16 头(>jsize), data_start = hsize
+    if header_size == jsize:
+        data_start = 16 + header_size
+    else:
+        data_start = header_size
     files = []
 
     def walk(node, prefix):
@@ -39,7 +45,8 @@ def asar_extract(path: str, out_dir: str) -> dict:
             else:
                 # 真实 asar 的 offset 是十进制字符串, 转 int
                 off_str = info.get("offset", 0)
-                off = int(off_str) if not isinstance(off_str, int) else off_str
+                rel_off = int(off_str) if not isinstance(off_str, int) else off_str
+                off = data_start + rel_off
                 size = info.get("size", 0)
                 files.append({"path": rel, "offset": off, "size": size})
 
