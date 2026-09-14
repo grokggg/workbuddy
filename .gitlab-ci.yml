@@ -15,13 +15,7 @@ analyze:
 
     # ---- stage 2: 格式识别 ----
     - "echo '=== [2/8] 格式识别 ==='"
-    - "python3 -c \"
-import sys
-sys.path.insert(0, '.')
-d = open('real-binaries/crackme-angr','rb').read(16)
-fmt = 'ELF' if d[:4]==b'\\x7fELF' else ('PE' if d[:2]==b'MZ' else 'Other')
-print(f'格式: {fmt}')
-\""
+    - "python3 -c \"d=open('real-binaries/crackme-angr','rb').read(4); print('格式: ELF' if d==b'\\\\x7fELF' else ('PE' if d[:2]==b'MZ' else 'Other'))\""
 
     # ---- stage 3: 静态分析 recon_v3 ----
     - "echo '=== [3/8] 静态分析 recon_v3 ==='"
@@ -44,17 +38,7 @@ print(f'格式: {fmt}')
     - "mkdir -p /tmp/out"
     - "python3 unified-analysis/analysis_all.py real-binaries/crackme-angr --out /tmp/out --json > /tmp/report.json || true"
     - "cp /tmp/out/*-cracked /tmp/out/cracked-binary 2>/dev/null || true"
-    - "python3 -c \"
-import subprocess, os
-bins = [f for f in os.listdir('/tmp/out') if 'cracked' in f]
-if bins:
-    r = subprocess.run(['/tmp/out/'+bins[0],'x'], capture_output=True, timeout=10)
-    open('/tmp/verify.log','w').write(f'rc={r.returncode} out={r.stdout[:60]}\\n')
-    print(f'verify: rc={r.returncode} out={r.stdout[:60]}')
-else:
-    open('/tmp/verify.log','w').write('no cracked binary\\n')
-    print('verify: 无破解二进制')
-\" || true"
+    - "python3 -c \"import subprocess,os; bins=[f for f in os.listdir('/tmp/out') if 'cracked' in f]; r=subprocess.run(['/tmp/out/'+bins[0],'x'],capture_output=True,timeout=10) if bins else None; open('/tmp/verify.log','w').write(f'rc={r.returncode} out={r.stdout[:60]}') if r else open('/tmp/verify.log','w').write('no cracked'); print('verify:', r.returncode if r else 'none')\" || true"
 
     # ---- stage 8: 打包 ----
     - "echo '=== [8/8] 打包 ==='"
