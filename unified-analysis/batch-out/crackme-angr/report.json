@@ -1,0 +1,97 @@
+{
+  "target": "/tmp/m31/up-tools/real-binaries/crackme-angr",
+  "format": "ELF",
+  "recon": {
+    "format": {
+      "type": "ELF",
+      "bits": 64,
+      "endian": "LE"
+    },
+    "size": 17080,
+    "elf_sections": 30,
+    "elf_imports": 10,
+    "entry": "0x1080"
+  },
+  "protections": [
+    "无壳/无保护"
+  ],
+  "static_checks": {
+    "count": 34,
+    "apis": [],
+    "behavior": [
+      "plain"
+    ]
+  },
+  "strategy": {
+    "engine": "规则推理(降级)",
+    "protections": [
+      "加壳(未知)"
+    ],
+    "strategies": [
+      {
+        "protection": "加壳(未知)",
+        "思路": "未识别特定保护, 先做动态观察确认实际行为",
+        "伪代码": [
+          "1. 沙箱运行, 记录文件/网络/注册表行为",
+          "2. 根据行为调整策略"
+        ],
+        "可行性": 0.5,
+        "工具链": [
+          "ProcMon",
+          "Wireshark",
+          "沙箱"
+        ],
+        "理由": "无特征时不应盲改, 行为分析优先",
+        "来源": "规则推理"
+      }
+    ]
+  },
+  "plan": [
+    "patch_checks"
+  ],
+  "patches": [
+    {
+      "off": "0x1217",
+      "what": "call后jne→NOP"
+    },
+    {
+      "off": "0x1271",
+      "what": "call后je→jmp"
+    },
+    {
+      "off": "0x128c",
+      "what": "call后jne→NOP"
+    }
+  ],
+  "cracked_path": "/tmp/m31/up-tools/unified-analysis/batch-out/crackme-angr/crackme-angr-cracked",
+  "verify": {
+    "x": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    },
+    "abc": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    },
+    "test": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    },
+    "p": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    },
+    "k": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    },
+    "A": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    },
+    "o": {
+      "out": "ongratulations! You have found the flag.",
+      "rc": 0
+    }
+  }
+}

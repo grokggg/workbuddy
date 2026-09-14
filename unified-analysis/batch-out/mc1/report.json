@@ -1,0 +1,97 @@
+{
+  "target": "/tmp/m31/up-tools/dynamic-crackmes/mc1",
+  "format": "ELF",
+  "recon": {
+    "format": {
+      "type": "ELF",
+      "bits": 64,
+      "endian": "LE"
+    },
+    "size": 303,
+    "elf_sections": 0,
+    "elf_imports": 0,
+    "entry": "0x400078"
+  },
+  "protections": [
+    "无壳/无保护"
+  ],
+  "static_checks": {
+    "count": 5,
+    "apis": [],
+    "behavior": [
+      "plain"
+    ]
+  },
+  "strategy": {
+    "engine": "规则推理(降级)",
+    "protections": [
+      "加壳(未知)"
+    ],
+    "strategies": [
+      {
+        "protection": "加壳(未知)",
+        "思路": "未识别特定保护, 先做动态观察确认实际行为",
+        "伪代码": [
+          "1. 沙箱运行, 记录文件/网络/注册表行为",
+          "2. 根据行为调整策略"
+        ],
+        "可行性": 0.5,
+        "工具链": [
+          "ProcMon",
+          "Wireshark",
+          "沙箱"
+        ],
+        "理由": "无特征时不应盲改, 行为分析优先",
+        "来源": "规则推理"
+      }
+    ]
+  },
+  "plan": [
+    "patch_checks"
+  ],
+  "patches": [
+    {
+      "off": "0x94",
+      "what": "je→jmp"
+    },
+    {
+      "off": "0xcd",
+      "what": "je→jmp"
+    },
+    {
+      "off": "0xde",
+      "what": "排除X→NOP"
+    }
+  ],
+  "cracked_path": "/tmp/m31/up-tools/unified-analysis/batch-out/mc1/mc1-cracked",
+  "verify": {
+    "x": {
+      "out": "OK",
+      "rc": 0
+    },
+    "abc": {
+      "out": "OK",
+      "rc": 0
+    },
+    "test": {
+      "out": "OK",
+      "rc": 0
+    },
+    "p": {
+      "out": "OK",
+      "rc": 0
+    },
+    "k": {
+      "out": "OK",
+      "rc": 0
+    },
+    "A": {
+      "out": "OK",
+      "rc": 0
+    },
+    "o": {
+      "out": "OK",
+      "rc": 0
+    }
+  }
+}

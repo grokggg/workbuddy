@@ -1,0 +1,84 @@
+name: Analyze Binary
+
+# M33: GitHub Actions 作为外部计算后端
+# 沙箱(受限)把计算卸载到 ubuntu-latest(有 gcc/gdb/angr/unicorn)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_path:
+        description: '目标文件路径(仓库内, 如 up-tools/real-binaries/crackme-angr)'
+        required: true
+        default: 'up-tools/real-binaries/crackme-angr'
+      mode:
+        description: '分析模式(full/static/symbolic)'
+        required: false
+        default: 'full'
+  repository_dispatch:
+    types: [analyze]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc gdb binutils python3-pip file
+          gcc --version | head -1
+          gdb --version | head -1
+          objdump --version | head -1
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install --quiet angr unicorn capstone pyelftools pefile z3-solver
+          python3 -c "import angr, unicorn, capstone; print('angr+unicorn+capstone OK')"
+
+      - name: 运行统一分析
+        env:
+          TARGET: ${{ github.event.inputs.target_path || 'real-binaries/crackme-angr' }}
+        run: |
+          cd up-tools
+          TARGET="${TARGET#up-tools/}"
+          python3 unified-analysis/analysis_all.py "$TARGET" \
+            --out /tmp/analysis-out --json > /tmp/analysis-report.json 2>&1 || true
+          echo "=== 报告 ==="
+          cat /tmp/analysis-report.json | head -50
+
+      - name: 符号执行(angr)
+        if: github.event.inputs.mode == 'symbolic' || github.event.inputs.mode == 'full'
+        run: |
+          cd up-tools
+          TARGET="${{ github.event.inputs.target_path || 'real-binaries/crackme-angr' }}"
+          TARGET="${TARGET#up-tools/}"
+          python3 -c "
+          import angr
+          proj = angr.Project('$TARGET', auto_load_libs=False)
+          print(f'angr loaded, entry={proj.entry:#x}')
+          state = proj.factory.entry_state()
+          print('state OK')
+          " 2>&1 | head -5 || true
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-report
+          path: |
+            /tmp/analysis-report.json
+            /tmp/analysis-out/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: 提交结果到仓库
+        if: always()
+        run: |
+          mkdir -p up-tools/orchestrator/results
+          cp /tmp/analysis-report.json up-tools/orchestrator/results/ 2>/dev/null || true
+          git config user.name "hermes-orchestrator"
+          git config user.email "hermes@nousresearch.com"
+          git add -A
+          git commit -m "chore: workflow 分析结果 (${{ github.run_id }})" || echo "无变更"
+          git push || echo "推送失败(可能无 token 权限)"

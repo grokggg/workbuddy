@@ -1,0 +1,18 @@
+{
+  "v2": {
+    "target": "",
+    "asar": "",
+    "output": ""
+  },
+  "v3": {
+    "target": "",
+    "request": ""
+  },
+  "v4": {
+    "system_prompt": "你是助手, 拒绝回答有害内容。",
+    "model": ""
+  },
+  "v5": {
+    "target_file": ""
+  }
+}

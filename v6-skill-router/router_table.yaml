@@ -1,0 +1,121 @@
+# v6-skill-router 路由表
+# 依据: BV13nTj6JEWT 蒸馏文档 11 技能全清单 + v8-web-reverse SKILL.md 边界声明
+# 语义: 一条输入进来 -> 逐条匹配 trigger 规则 -> 命中即路由到对应 skill
+# 与视频的对应: 视频里 "11 个 skill 编织成路由网, AI 自己决定派谁上",
+# 这里把"边界声明"物化成可执行的路由规则。
+
+version: 6
+default_skill: skill-creator
+skills:
+
+  - id: skill-creator
+    name: skill-creator
+    role: 元技能
+    triggers:
+      - "创建.*skill"
+      - "新建.*技能"
+      - "写.*SKILL.md"
+      - "评估.*skill"
+      - "打包.*skill"
+    boundary: 兜底技能。没有其他规则命中时用它。
+
+  - id: env-patch
+    name: env-patch
+    role: 通用补环境
+    triggers:
+      - "补环境"
+      - "Node.*沙箱"
+      - "环境代理"
+    boundary: 需要"运行 -> 诊断缺失环境 -> 补环境 -> 验证"闭环时用。
+
+  - id: find-crypto-entry
+    name: find-crypto-entry
+    role: 定位加密入口
+    triggers:
+      - "定位.*sign|定位.*token|定位.*加密参数|定位.*签名参数"
+      - "sign参数在哪|token在哪|加密参数在哪|入口在哪"
+      - "加密参数|签名参数|sign.*入口|token.*入口"
+    boundary: 只做定位, 不做 AST 解混淆。解混淆交给 ast-deobfuscate。
+
+  - id: ast-deobfuscate
+    name: ast-deobfuscate
+    role: AST 解混淆
+    triggers:
+      - "解混淆|反混淆|控制流还原|字符串数组还原"
+      - "obfuscator.io|sojson|jsjiami"
+    boundary: 只处理 AST 层。调用链追踪交给 find-crypto-entry。
+
+  - id: web-protocol-recovery
+    name: web-protocol-recovery
+    role: 协议还原
+    triggers:
+      - "协议还原|协议恢复"
+      - "还原成纯 Python|browser-free"
+    boundary: 完整分层协议(多层加密+解码+传输包装), 必须输出协议图谱。
+
+  - id: gt4-protocol-reverse
+    name: gt4-protocol-reverse
+    role: 极验 GT4 滑块
+    triggers:
+      - "极验|geetest|GT4"
+      - "pow_msg|pow_sign|lot_number"
+    boundary: 仅处理 GT4 协议; 滑块行为数据采集交给 v8-web-reverse 可信输入。
+
+  - id: tencent-slide-tdc-env
+    name: tencent-slide-tdc-env
+    role: 腾讯滑块 TDC
+    triggers:
+      - "腾讯滑块|TDCaptcha|TDC"
+      - "slide.html"
+    boundary: 腾讯滑块定向补环境; 深层 TDC 算法不在本 skill。
+
+  - id: v8-web-reverse
+    name: v8-web-reverse
+    role: 交付 iv8 紧凑脚本
+    triggers:
+      - "iv8|V8 补环境"
+      - "生成.*Python 脚本.*iv8"
+      - "紧凑可运行"
+      - "iv8.*cookie|iv8.*sign|执行.*js.*回放|iv8.*回放"   # 组合约束, 见 note
+    boundary: |
+      只交付"iv8 执行浏览器 JS + requests 回放真实请求"的紧凑主脚本。
+      明确不做: 定位入口(find-crypto-entry)、hook 片段(browser-hook-snippets)、
+      AST(ast-deobfuscate)、Node 补环境(env-patch)、瑞数深度字节码。
+    note: "cookie/sign 等词单独出现不路由(太泛); 需与 iv8/执行/回放 组合才命中"
+
+  - id: browser-hook-snippets
+    name: browser-hook-snippets
+    role: 浏览器 Hook
+    triggers:
+      - "hook|Hook 脚本"
+      - "监控.*cookie|XHR|fetch|WebCrypto|canvas"
+    boundary: 只注入 hook 脚本观察行为, 不做逆向结论。
+
+  - id: rs-reverse
+    name: rs-reverse
+    role: 瑞数专项
+    triggers:
+      - "瑞数|Ruishu|RiverSecurity|r2mka|S_tsn|412"
+    boundary: 仅在有明确瑞数证据时启用; 固定本地项目结构。
+
+  - id: waf-cookie-pure-first
+    name: waf-cookie-pure-first
+    role: WAF Cookie 专项
+    triggers:
+      - "WAF|challenge cookie|__w_tsfp|反爬 cookie"
+      - "动态 cookie 探针"
+    boundary: 优先纯 Python 协议还原; 算不动才退回 v8 执行。
+
+# 冲突消解顺序: 专项 > 通用 > 元技能
+priority:
+  - gt4-protocol-reverse
+  - tencent-slide-tdc-env
+  - rs-reverse
+  - waf-cookie-pure-first
+  - v8-web-reverse
+  - web-protocol-recovery
+  - ast-deobfuscate
+  - browser-hook-snippets
+  - find-crypto-entry
+  - env-patch
+  - skill-creator
