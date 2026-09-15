@@ -431,7 +431,7 @@ class ChainRunnerFull:
         self.repack_path = os.path.join(self.out_dir, "app-repacked.asar")
         try:
             sys.path.insert(0, os.path.join(os.path.dirname(__file__),
-                                            "..", "..", "..", "unified-analysis"))
+                                            "..", "..", "unified-analysis"))
             from process_asar import asar_pack
             sz = asar_pack(self.extract_dir, self.repack_path)
             r["command"] = (f"python3 -c \"from process_asar import asar_pack; "
