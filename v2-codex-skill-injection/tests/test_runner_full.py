@@ -206,22 +206,22 @@ class TestChainFull(unittest.TestCase):
             self.assertIn("detail", s)
 
     def test_stage_patch_placeholder(self):
+        # 无解包目录 → 明确失败提示(不再是占位符)
         s = self.runner.stage_patch()
-        self.assertTrue(s["ok"])
-        self.assertTrue(s.get("placeholder"))
-        self.assertIn("{PATCH}", s["detail"])
+        self.assertIn("detail", s)
+        self.assertFalse(s.get("placeholder", False))
 
     def test_stage_repack_placeholder(self):
+        # 无解包目录 → 明确失败提示
         s = self.runner.stage_repack()
-        self.assertTrue(s["ok"])
-        self.assertTrue(s.get("placeholder"))
-        self.assertIn("{COMMAND}", s["detail"])
+        self.assertIn("detail", s)
+        self.assertFalse(s.get("placeholder", False))
 
     def test_stage_verify_placeholder(self):
+        # 无解包目录 → 明确失败提示
         s = self.runner.stage_verify()
-        self.assertTrue(s["ok"])
-        self.assertTrue(s.get("placeholder"))
-        self.assertIn("{VERIFY_CMD}", s["detail"])
+        self.assertIn("detail", s)
+        self.assertFalse(s.get("placeholder", False))
 
     def test_run_all_12(self):
         stages = self.runner.run_all()

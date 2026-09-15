@@ -275,21 +275,8 @@ def cmd_run(a):
 
 def cmd_run_full(a):
     """真正执行十二段链（解包/查看/定位真实执行, 修改/打包占位）。"""
-    import sys as _sys, os as _os
-    _sys.path.insert(0, _os.path.dirname(_os.path.dirname(
-        _os.path.abspath(__file__))))
-    from lib.config_util import load_config, resolve_param
     from lib.runner_full import ChainRunnerFull
-    cfg = load_config(a.config)
-    target = resolve_param(cfg, "v2", "target", env="TARGET_PATH",
-                           default="", cli_value=a.target)
-    out = resolve_param(cfg, "v2", "output", env="OUTPUT_DIR",
-                        default=None, cli_value=a.out)
-    if not target:
-        print("错误: 未指定目标。用 TARGET_PATH 环境变量 / config.json / 命令行",
-              file=sys.stderr)
-        return 1
-    runner = ChainRunnerFull(target, out_dir=out)
+    runner = ChainRunnerFull(a.target, out_dir=a.out)
     stages = runner.run_all()
     if a.json:
         print(json.dumps(stages, ensure_ascii=False, indent=2))
@@ -343,10 +330,8 @@ def main(argv=None):
     p.set_defaults(fn=cmd_run)
 
     p = sub.add_parser("run-full", help="真正执行十二段链（解包/查看/定位真实执行, 修改/打包占位）")
-    p.add_argument("target", nargs="?", default=None,
-                   help="目标应用安装根目录(默认从 config/环境变量)")
+    p.add_argument("target", help="目标应用安装根目录")
     p.add_argument("--out", default=None, help="输出工作目录")
-    p.add_argument("--config", default=None, help="config.json 路径")
     p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_run_full)
 

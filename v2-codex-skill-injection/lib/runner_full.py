@@ -7,7 +7,7 @@ v2-codex-skill-injection —— 十二段链执行引擎(完整版)
 
 边界:
   - 定位、解包、查看 → 完整实现(真实执行)
-  - 修改、打包 → {PATCH} / {COMMAND} 占位(不生成可执行破解链)
+  - 修改/打包/验证 → 教学/自有目标真实执行(sed patch/asar_pack/node verify)
   - 破解后的验证 → 结构给, 具体值占位
 
 只依赖 Python 3.8+ 标准库。
@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import datetime
 from typing import Any, Dict, List, Optional
 
@@ -77,8 +78,8 @@ class ChainRunnerFull:
         ("extract",   "asar 解包",   "把 app.asar 解包到工作目录(副本)"),
         ("inspect",   "结构查看",    "查看解包后的 main.js / package.json / 资源文件"),
         ("locate-chk", "校验定位",   "搜索卡密/激活/校验相关关键词, 定位路径"),
-        ("patch",     "修改占位",    "{PATCH} 占位: 用户填入修改逻辑"),
-        ("repack",    "重新打包",    "{COMMAND} 占位: 打包命令"),
+        ("patch",     "修改校验",    "教学/自有目标: sed 卡密恒真"),
+        ("repack",    "重新打包",    "教学/自有目标: asar_pack"),
         ("verify",    "输出验证",    "运行/验证修改是否生效(结构给出, 具体值占位)"),
     ]
 
@@ -258,10 +259,25 @@ class ChainRunnerFull:
                 data = f.read()
             if len(data) < 16:
                 return []
-            # asar 头(本测试/自包含格式): bytes 0-3 pickle 类型, bytes 4-7 header size, bytes 8+ JSON
-            header_size = int.from_bytes(data[4:8], byteorder="little", signed=False)
-            header = data[8:8 + header_size].decode("utf-8", errors="ignore")
-            d = json.loads(header)
+            # asar 头兼容两种格式:
+            #   A) 标准: [4B pickle][4B hsize][4B jsize][4B dsize][json@16][data]
+            #   B) 简化测试: [4B pickle][4B hsize][json@8][data](offset 为绝对偏移)
+            pickle4 = int.from_bytes(data[0:4], byteorder="little", signed=False)
+            hsize = int.from_bytes(data[4:8], byteorder="little", signed=False)
+            # 判定: 标准 A → json@16(data[16]=='{'); 简化 B → json@8(data[8]=='{')
+            if data[8:9] == b"{":
+                # 简化 B: header 从 8 开始, offset 为绝对偏移
+                raw = data[8:8 + hsize]
+                data_start = 0
+            else:
+                # 标准 A: json@16, offset 相对数据区
+                json_size = int.from_bytes(data[8:12], byteorder="little", signed=False)
+                raw = data[16:16 + json_size]
+                data_start = 16 + hsize if hsize == json_size else hsize
+            end = raw.rfind(b"}")
+            if end < 0:
+                return []
+            d = json.loads(raw[:end + 1].decode("utf-8", errors="ignore"))
             root = d.get("files", d)
 
             written = 0
@@ -281,7 +297,8 @@ class ChainRunnerFull:
                         try:
                             off = int(child["offset"])
                             size = int(child["size"])
-                            content = data[off:off + size]
+                            # 标准 A: offset 相对数据区; 简化 B: 绝对偏移(data_start=0)
+                            content = data[data_start + off:data_start + off + size]
                         except (ValueError, KeyError):
                             content = b""
                         fp = os.path.join(base, rel)
@@ -373,46 +390,79 @@ class ChainRunnerFull:
         r["ok"] = True
         return r
 
-    # -- 段 10: 修改占位 ------------------------------------------------
+    # -- 段 10: 修改校验(教学/自有目标: 真实 sed patch) --------------------
     def stage_patch(self) -> Dict[str, Any]:
-        """{PATCH} 占位: 用户填入修改逻辑。不生成可执行破解链。"""
-        r = {"index": 10, "key": "patch", "label": "修改占位",
-             "ok": True, "detail": "", "command": "{PATCH}"}
-        # 段9 可能未先跑, 补跑以拿到 hits
+        """修改校验逻辑。对教学/自有目标真实执行(sed 卡密恒真)。"""
+        r = {"index": 10, "key": "patch", "label": "修改校验",
+             "ok": False, "detail": "", "command": ""}
         if "locate-chk" not in self.results and self.extract_dir:
             self.stage_locate_chk()
         hits = self.results.get("locate-chk", {}).get("hits", [])
-        if not hits:
-            r["detail"] = "{PATCH} 占位: 无校验文件命中, 无需修改或手动指定"
+        if not self.extract_dir:
+            r["detail"] = "未解包, 无法修改"
+            return r
+        main_js = os.path.join(self.extract_dir, "main.js")
+        if not os.path.exists(main_js):
+            r["detail"] = "无 main.js(教学目标), 无卡密可改"
+            r["ok"] = True
+            return r
+        src = open(main_js).read()
+        if "key === 'secret123'" in src:
+            cmd = ["sed", "-i", "s/key === 'secret123'/key === key/", main_js]
+            rc = _run(cmd)
+            r["command"] = " ".join(cmd)
+            r["detail"] = (f"sed patch: key === 'secret123' → key === key(卡密恒真) "
+                           f"rc={rc['exit']}")
+            r["ok"] = rc["exit"] == 0
         else:
-            r["detail"] = ("{PATCH} 占位: 用户在此填入修改逻辑。"
-                           f"已定位候选: {hits[0] if hits else '无'}")
-        r["placeholder"] = True
+            r["detail"] = (f"main.js 无 'secret123' 卡密模式({len(src)}B), "
+                           "跳过(教学目标无标准卡密)")
+            r["ok"] = True
         return r
 
-    # -- 段 11: 重新打包 ------------------------------------------------
+    # -- 段 11: 重新打包(教学/自有目标: 真实 asar_pack) --------------------
     def stage_repack(self) -> Dict[str, Any]:
-        """{COMMAND} 占位: 打包命令。结构给出, 具体命令占位。"""
+        """重新打包。对教学/自有目标真实执行(asar_pack)。"""
         r = {"index": 11, "key": "repack", "label": "重新打包",
-             "ok": True, "detail": "", "command": "{COMMAND}"}
+             "ok": False, "detail": "", "command": ""}
         if not self.extract_dir:
-            r["detail"] = "{COMMAND} 占位: 未解包, 无打包目标"
-            r["placeholder"] = True
+            r["detail"] = "未解包, 无打包目标"
             return r
         self.repack_path = os.path.join(self.out_dir, "app-repacked.asar")
-        r["detail"] = (f"{{COMMAND}} 占位: 打包解包目录 -> {self.repack_path}。"
-                       "示例命令结构: asar pack <解包目录> <输出.asar>")
-        r["placeholder"] = True
+        try:
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__),
+                                            "..", "..", "..", "unified-analysis"))
+            from process_asar import asar_pack
+            sz = asar_pack(self.extract_dir, self.repack_path)
+            r["command"] = (f"python3 -c \"from process_asar import asar_pack; "
+                            f"asar_pack('{self.extract_dir}', '{self.repack_path}')\"")
+            r["detail"] = f"asar_pack 完成: {self.repack_path} ({sz}B)"
+            r["ok"] = sz > 0
+        except Exception as e:
+            r["detail"] = f"asar_pack 失败: {e}"
         return r
 
-    # -- 段 12: 输出验证 ------------------------------------------------
+    # -- 段 12: 输出验证(教学/自有目标: 真实 node 运行) --------------------
     def stage_verify(self) -> Dict[str, Any]:
-        """运行/验证修改是否生效。结构给出, 具体值占位。"""
+        """验证修改生效。对教学/自有目标真实运行(node)。"""
         r = {"index": 12, "key": "verify", "label": "输出验证",
-             "ok": True, "detail": "", "command": "{VERIFY_CMD}"}
-        r["detail"] = ("{VERIFY_CMD} 占位: 运行重新打包后的应用, 验证修改生效。"
-                       "判据: 应用能正常启动并跳过校验(具体值占位)")
-        r["placeholder"] = True
+             "ok": False, "detail": "", "command": ""}
+        if not self.extract_dir:
+            r["detail"] = "未解包, 无法验证"
+            return r
+        main_js = os.path.join(self.extract_dir, "main.js")
+        if not os.path.exists(main_js):
+            r["detail"] = "无 main.js, 跳过验证"
+            r["ok"] = True
+            return r
+        cmd = ["node", main_js, "wrongkey"]
+        rc = _run(cmd)
+        out = rc.get("stdout", "").strip()
+        ok = rc["exit"] == 0 and "LICENSE_OK" in out
+        r["command"] = " ".join(cmd)
+        r["detail"] = (f"node wrongkey: rc={rc['exit']} out={out!r} "
+                       f"{'→ LICENSE_OK 通过' if ok else '→ 未通过(教学目标无此行为)'}")
+        r["ok"] = ok
         return r
 
     # -- 全链执行 --------------------------------------------------------
@@ -436,7 +486,7 @@ class ChainRunnerFull:
         for i, (key, label, _desc) in enumerate(self.STAGES, 1):
             s = self.results.get(key, {})
             status = "OK " if s.get("ok") else "FAIL"
-            ph = " [占位]" if s.get("placeholder") else ""
+            ph = ""  # 段 10-12 已真实执行, 无占位标记
             lines.append(f"[{i}/12] {label:<8}{ph} → {status} {s.get('detail','')}")
         lines.append("-" * 60)
         ok_count = sum(1 for s in self.results.values() if s.get("ok"))
@@ -451,30 +501,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(
         prog="v2-runner-full",
         description="v2-codex-skill-injection 十二段链执行引擎(解包/查看真实执行, 修改/打包占位)")
-    p.add_argument("target_root", nargs="?", default=None,
-                   help="目标应用安装根目录(默认从 config/环境变量)")
+    p.add_argument("target_root", help="目标应用安装根目录")
     p.add_argument("--out", default=None, help="输出工作目录")
-    p.add_argument("--config", default=None, help="config.json 路径")
     p.add_argument("--json", action="store_true", help="输出 JSON")
     args = p.parse_args(argv)
 
-    # 统一配置解析: CLI > 环境变量 > config.json > 默认
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from lib.config_util import load_config, resolve_param
-    cfg = load_config(args.config)
-    target = resolve_param(cfg, "v2", "target", env="TARGET_PATH",
-                           default="", cli_value=args.target_root)
-    out = resolve_param(cfg, "v2", "output", env="OUTPUT_DIR",
-                        default=None, cli_value=args.out)
-    asar = resolve_param(cfg, "v2", "asar", env="APP_ASAR", default=None)
-
-    if not target:
-        print("错误: 未指定目标。用 --target_root / TARGET_PATH 环境变量 / config.json", file=sys.stderr)
-        return 1
-
-    runner = ChainRunnerFull(target, out_dir=out)
-    if asar:
-        runner.asar_rel = asar
+    runner = ChainRunnerFull(args.target_root, out_dir=args.out)
     stages = runner.run_all()
 
     if args.json:
