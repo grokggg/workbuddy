@@ -111,15 +111,57 @@ class Analyzer:
         strings = re.findall(rb"[\x20-\x7e]{4,}", data)
         r["strings"] = [s.decode("ascii", errors="ignore") for s in strings[:50]]
 
-        # 条件跳转扫描
-        r["jump_hits"] = self.scan_jumps(data)
+        # 条件跳转扫描(跳过文件头, 避免魔数/头误判)
+        scan_start = 0
+        if data[:4] == b"\x7fELF":
+            # ELF: 从入口点所在 PT_LOAD 段开始(跳过含头的首段)
+            try:
+                entry = struct.unpack("<Q", data[0x18:0x20])[0]
+                ph_off = struct.unpack("<Q", data[0x20:0x28])[0]
+                ph_entsz = struct.unpack("<H", data[0x36:0x38])[0]
+                ph_num = struct.unpack("<H", data[0x38:0x3A])[0]
+                for i in range(ph_num):
+                    off = ph_off + i * ph_entsz
+                    p_type = struct.unpack("<I", data[off:off + 4])[0]
+                    if p_type == 1:  # PT_LOAD
+                        p_offset = struct.unpack("<Q", data[off + 8:off + 16])[0]
+                        p_vaddr = struct.unpack("<Q", data[off + 16:off + 24])[0]
+                        if p_vaddr <= entry < p_vaddr + 0x1000000:
+                            scan_start = p_offset + (entry - p_vaddr)
+                            break
+            except Exception:
+                scan_start = 0x40  # 兜底: 跳过 ELF 头
+        elif data[:2] == b"MZ":
+            # PE: 从 AddressOfEntryPoint 计算文件偏移(跳过 DOS/PE 头)
+            try:
+                pe_off = struct.unpack("<I", data[0x3C:0x40])[0]
+                entry_rva = struct.unpack("<I", data[pe_off + 0x28:pe_off + 0x2C])[0]
+                # 找 section 定位 entry RVA → 文件偏移
+                nsec = struct.unpack("<H", data[pe_off + 6:pe_off + 8])[0]
+                opt_size = struct.unpack("<H", data[pe_off + 20:pe_off + 22])[0]
+                sec_off = pe_off + 24 + opt_size
+                for i in range(nsec):
+                    so = sec_off + i * 40
+                    va = struct.unpack("<I", data[so + 12:so + 16])[0]
+                    vsize = struct.unpack("<I", data[so + 8:so + 12])[0]
+                    raw = struct.unpack("<I", data[so + 20:so + 24])[0]
+                    if va <= entry_rva < va + max(vsize, 1):
+                        scan_start = raw + (entry_rva - va)
+                        break
+            except Exception:
+                scan_start = 0x200  # 兜底: 常见 PE 代码起点
+        r["jump_hits"] = self.scan_jumps(data, scan_start)
+        r["scan_start"] = scan_start
         r["ok"] = True
         return r
 
-    def scan_jumps(self, data: bytes) -> List[Dict[str, Any]]:
-        """扫描条件跳转指令。返回 [{offset, mnemonic, opcode}]。"""
+    def scan_jumps(self, data: bytes, start: int = 0) -> List[Dict[str, Any]]:
+        """扫描条件跳转指令。返回 [{offset, mnemonic, opcode}]。
+
+        start: 扫描起点(跳过文件头, 避免 ELF 魔数 0x7f/PE 头误判)。
+        """
         hits = []
-        i = 0
+        i = start
         while i < len(data) - 1:
             b = data[i]
             # 短跳转
