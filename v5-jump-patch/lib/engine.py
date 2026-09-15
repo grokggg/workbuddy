@@ -111,56 +111,100 @@ class Analyzer:
         strings = re.findall(rb"[\x20-\x7e]{4,}", data)
         r["strings"] = [s.decode("ascii", errors="ignore") for s in strings[:50]]
 
-        # 条件跳转扫描(跳过文件头, 避免魔数/头误判)
+        # 条件跳转扫描: 只扫 executable 范围(避免 .rodata/.data 字节误报)
         scan_start = 0
+        exec_ranges = []  # [(start_off, end_off)] 文件偏移可执行范围
         if data[:4] == b"\x7fELF":
-            # ELF: 从入口点所在 PT_LOAD 段开始(跳过含头的首段)
+            # ELF: 收集所有 PF_X 的 PT_LOAD 段(executable)
             try:
-                entry = struct.unpack("<Q", data[0x18:0x20])[0]
                 ph_off = struct.unpack("<Q", data[0x20:0x28])[0]
                 ph_entsz = struct.unpack("<H", data[0x36:0x38])[0]
                 ph_num = struct.unpack("<H", data[0x38:0x3A])[0]
                 for i in range(ph_num):
                     off = ph_off + i * ph_entsz
                     p_type = struct.unpack("<I", data[off:off + 4])[0]
-                    if p_type == 1:  # PT_LOAD
+                    p_flags = struct.unpack("<I", data[off + 4:off + 8])[0]
+                    if p_type == 1 and (p_flags & 1):  # PT_LOAD + PF_X
                         p_offset = struct.unpack("<Q", data[off + 8:off + 16])[0]
-                        p_vaddr = struct.unpack("<Q", data[off + 16:off + 24])[0]
-                        if p_vaddr <= entry < p_vaddr + 0x1000000:
-                            scan_start = p_offset + (entry - p_vaddr)
-                            break
+                        p_filesz = struct.unpack("<Q", data[off + 32:off + 40])[0]
+                        exec_ranges.append((p_offset, p_offset + p_filesz))
+                if exec_ranges:
+                    scan_start = exec_ranges[0][0]
+                else:
+                    scan_start = 0x40
             except Exception:
-                scan_start = 0x40  # 兜底: 跳过 ELF 头
+                scan_start = 0x40
+            # 兜底: 手工/无段表 ELF(教学 crackme) → 全文件从 scan_start 扫
+            if not exec_ranges:
+                scan_start = 0x40
         elif data[:2] == b"MZ":
-            # PE: 从 AddressOfEntryPoint 计算文件偏移(跳过 DOS/PE 头)
+            # PE: 从 AddressOfEntryPoint 所在 section 起, 收集 executable section
             try:
                 pe_off = struct.unpack("<I", data[0x3C:0x40])[0]
                 entry_rva = struct.unpack("<I", data[pe_off + 0x28:pe_off + 0x2C])[0]
-                # 找 section 定位 entry RVA → 文件偏移
                 nsec = struct.unpack("<H", data[pe_off + 6:pe_off + 8])[0]
                 opt_size = struct.unpack("<H", data[pe_off + 20:pe_off + 22])[0]
                 sec_off = pe_off + 24 + opt_size
                 for i in range(nsec):
                     so = sec_off + i * 40
-                    va = struct.unpack("<I", data[so + 12:so + 16])[0]
-                    vsize = struct.unpack("<I", data[so + 8:so + 12])[0]
+                    chars = struct.unpack("<I", data[so + 36:so + 40])[0]
                     raw = struct.unpack("<I", data[so + 20:so + 24])[0]
-                    if va <= entry_rva < va + max(vsize, 1):
-                        scan_start = raw + (entry_rva - va)
-                        break
+                    rsize = struct.unpack("<I", data[so + 16:so + 20])[0]
+                    if (chars & 0x20000000) and rsize:  # IMAGE_SCN_MEM_EXECUTE
+                        exec_ranges.append((raw, raw + rsize))
+                if exec_ranges:
+                    scan_start = exec_ranges[0][0]
+                else:
+                    scan_start = 0x200
             except Exception:
-                scan_start = 0x200  # 兜底: 常见 PE 代码起点
-        r["jump_hits"] = self.scan_jumps(data, scan_start)
+                scan_start = 0x200
+                exec_ranges = []
+            # 兜底: 简化/手工 PE(教学 fixture) → 从 0x40(DOS 头后)全文件扫
+            if not exec_ranges:
+                scan_start = 0x40
+                exec_ranges = []
+        r["jump_hits"] = self.scan_jumps(data, scan_start, exec_ranges)
         r["scan_start"] = scan_start
+        r["exec_ranges"] = exec_ranges
         r["ok"] = True
         return r
 
-    def scan_jumps(self, data: bytes, start: int = 0) -> List[Dict[str, Any]]:
+    def scan_jumps(self, data: bytes, start: int = 0,
+                   exec_ranges: Optional[List[tuple]] = None) -> List[Dict[str, Any]]:
         """扫描条件跳转指令。返回 [{offset, mnemonic, opcode}]。
 
         start: 扫描起点(跳过文件头, 避免 ELF 魔数 0x7f/PE 头误判)。
+        exec_ranges: 可执行段范围 [(start_off, end_off)]; 提供则只扫这些范围
+                     (避免 .rodata/.data 里的 0x70-0x7F 字节误报)。
         """
         hits = []
+        if exec_ranges:
+            # 只扫 executable 范围
+            for r_start, r_end in exec_ranges:
+                i = r_start
+                while i < min(r_end, len(data) - 1):
+                    b = data[i]
+                    if b in CONDITIONAL_JUMPS:
+                        hits.append({
+                            "offset": i,
+                            "mnemonic": CONDITIONAL_JUMPS[b],
+                            "opcode": f"{b:02X}",
+                            "size": 2,
+                            "type": "short",
+                        })
+                        i += 2
+                    elif b == 0x0F and i + 1 < len(data) and data[i + 1] in CONDITIONAL_JUMPS_NEAR:
+                        hits.append({
+                            "offset": i,
+                            "mnemonic": CONDITIONAL_JUMPS_NEAR[data[i + 1]],
+                            "opcode": f"0F {data[i+1]:02X}",
+                            "size": 6,
+                            "type": "near",
+                        })
+                        i += 6
+                    else:
+                        i += 1
+            return hits
         i = start
         while i < len(data) - 1:
             b = data[i]
@@ -198,6 +242,7 @@ class Patcher:
         self.target = target
         self.work_dir = work_dir
         self.copy_path = ""
+        self.exec_ranges: List[tuple] = []  # 由 JumpPatchEngine 注入
 
     def make_copy(self) -> str:
         """复制目标到工作目录(副本)。"""
@@ -208,7 +253,13 @@ class Patcher:
         return self.copy_path
 
     def nop_jump(self, offset: int, size: int) -> Dict[str, Any]:
-        """把 offset 处 size 字节改为 NOP(只改副本)。"""
+        """把 offset 处 size 字节改为 NOP(只改副本)。
+
+        保护:
+          1. 目标字节必须是指令(jcc opcode 或 0x90)
+          2. 目标位置必须在可执行范围内(exec_ranges)
+          否则拒绝, 不静默 NOP。
+        """
         r = {"ok": False, "detail": ""}
         if not self.copy_path or not os.path.exists(self.copy_path):
             r["detail"] = "未创建副本。先 make_copy()"
@@ -218,6 +269,27 @@ class Patcher:
             orig = f.read(size)
             f.seek(offset)
             f.write(bytes([NOP] * size))
+        # 保护 1: 目标字节必须是 jcc opcode(0x70-0x7F)或 0F 8x 或已是 NOP
+        first = orig[0] if orig else 0
+        is_jcc = (0x70 <= first <= 0x7F) or (first == 0x0F and len(orig) > 1 and 0x80 <= orig[1] <= 0x8F) or (first == NOP)
+        if not is_jcc:
+            # 回滚
+            with open(self.copy_path, "r+b") as f:
+                f.seek(offset)
+                f.write(orig)
+            r["detail"] = (f"拒绝: 偏移 {offset:#x} 处字节 {orig.hex()} 不是条件跳转"
+                           f"(jcc 0x70-0x7F / 0F 8x), 已回滚。可能不是指令边界。")
+            return r
+        # 保护 2: 目标必须在可执行范围
+        if self.exec_ranges:
+            in_exec = any(s <= offset < e for s, e in self.exec_ranges)
+            if not in_exec:
+                with open(self.copy_path, "r+b") as f:
+                    f.seek(offset)
+                    f.write(orig)
+                r["detail"] = (f"拒绝: 偏移 {offset:#x} 不在可执行段范围"
+                               f"{[(hex(s),hex(e)) for s,e in self.exec_ranges]}, 已回滚。")
+                return r
         r["ok"] = True
         r["orig"] = orig.hex()
         r["patched"] = (bytes([NOP] * size)).hex()
@@ -333,6 +405,8 @@ class JumpPatchEngine:
             return r
         copy = self.patcher.make_copy()
         r["detail"] = f"副本: {copy}"
+        # 传 exec_ranges 给 patcher(保护 2: 校验可执行范围)
+        self.patcher.exec_ranges = self.analysis.get("exec_ranges", [])
         res = self.patcher.nop_jump(self.chosen_jump["offset"],
                                     self.chosen_jump["size"])
         r["detail"] += f"\n  {res['detail']}"
