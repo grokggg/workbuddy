@@ -273,7 +273,17 @@ class ChainRunnerFull:
                 # 标准 A: json@16, offset 相对数据区
                 json_size = int.from_bytes(data[8:12], byteorder="little", signed=False)
                 raw = data[16:16 + json_size]
-                data_start = 16 + hsize if hsize == json_size else hsize
+                # 数据区按头字段关系判别(三种历史格式):
+                #   Node/真实 asar: [4:8]=[8:12]+4 → 数据区 = 8 + [4:8]
+                #   旧测试 fixture: [4:8]=[8:12]+16 → 数据区 = 16 + [8:12]
+                #   M23 自建:       [4:8]==[8:12]  → 数据区 = 16 + [4:8]
+                diff = hsize - json_size
+                if diff == 4:
+                    data_start = 8 + hsize
+                elif diff == 16:
+                    data_start = 16 + json_size
+                else:
+                    data_start = 16 + hsize
             end = raw.rfind(b"}")
             if end < 0:
                 return []

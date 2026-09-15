@@ -89,7 +89,11 @@ function parseHeader(file) {
     // 布局：8 字节 magic + 4 + 4 之后才是 header 字符串
     const buf = Buffer.alloc(headerStrSize);
     fs.readSync(fd, buf, 0, headerStrSize, 16);
-    return JSON.parse(buf.toString('utf8'));
+    // 兼容 padding：部分实现（纯 Python asar_pack）会把 header JSON
+    // padding 到 4 字节对齐，尾部带 \x00，Node 严格 JSON.parse 会报 Extra data。
+    let s = buf.toString('utf8');
+    s = s.replace(/\x00+$/, '');
+    return JSON.parse(s);
   } finally {
     fs.closeSync(fd);
   }

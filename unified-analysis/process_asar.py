@@ -28,13 +28,20 @@ def asar_extract(path: str, out_dir: str) -> dict:
     end = raw.rfind(b"}")
     header = json.loads(raw[:end + 1].decode())
     header_size = struct.unpack("<I", d[4:8])[0]
-    # 数据起点兼容两种格式:
-    #   M23 自建: hsize==jsize(不含16头), data_start = 16 + hsize
-    #   真实 asar: hsize 含 16 头(>jsize), data_start = hsize
-    if header_size == jsize:
-        data_start = 16 + header_size
+    jsize = struct.unpack("<I", d[8:12])[0]
+    # 数据起点按头字段关系判别(三种历史格式):
+    #   Node/真实 asar: [4:8]=[8:12]+4 → 数据区 = 8 + [4:8]
+    #   旧测试 fixture: [4:8]=[8:12]+16 → 数据区 = 16 + [8:12]
+    #   M23 自建:       [4:8]==[8:12]  → 数据区 = 16 + [4:8]
+    hsize = struct.unpack("<I", d[4:8])[0]
+    jsize = struct.unpack("<I", d[8:12])[0]
+    diff = hsize - jsize
+    if diff == 4:
+        data_start = 8 + hsize
+    elif diff == 16:
+        data_start = 16 + jsize
     else:
-        data_start = header_size
+        data_start = 16 + hsize
     files = []
 
     def walk(node, prefix):
@@ -62,10 +69,13 @@ def asar_extract(path: str, out_dir: str) -> dict:
 
 def asar_pack(src_dir: str, out_path: str) -> int:
     """纯 Python asar 打包。"""
+    out_abs = os.path.abspath(out_path)
     files = {}
     for root, dirs, fnames in os.walk(src_dir):
         for fn in sorted(fnames):
             p = os.path.join(root, fn)
+            if os.path.abspath(p) == out_abs:
+                continue  # 排除输出文件自身(避免把 app.asar 打进去)
             rel = os.path.relpath(p, src_dir).replace(os.sep, "/")
             files[rel] = os.path.getsize(p)
     header = {"files": {}}
@@ -81,21 +91,23 @@ def asar_pack(src_dir: str, out_path: str) -> int:
                 cur = cur.setdefault(part, {"files": {}})["files"]
         data_off += size
     header_json = json.dumps(header, separators=(",", ":")).encode()
-    pad = (4 - len(header_json) % 4) % 4
-    header_json += b"\x00" * pad
+    # padding 统一在写入时处理(align 8, 见下), 此处不提前 pad
     with open(out_path, "wb") as f:
         f.write(struct.pack("<I", 4))
-        f.write(struct.pack("<I", len(header_json)))
-        f.write(struct.pack("<I", len(header_json)))
-        f.write(struct.pack("<I", 0))  # data size placeholder
+        jlen = len(header_json)
+        align4 = (jlen + 3) & ~3  # Pickle.writeBytes 按 4 对齐
+        f.write(struct.pack("<I", 8 + align4))  # sizePickle payload = headerBuf.length
+        f.write(struct.pack("<I", 4 + align4))  # headerPickle payloadSize
+        f.write(struct.pack("<I", jlen))        # writeInt(JSON 长度)
         f.write(header_json)
+        f.write(b"\x00" * (align4 - jlen))      # pad 到 4 对齐
+        # 数据区(Node 公式) = 8 + [4:8] + fileOffset = 8 + 8 + align4 = 16 + align4
+        # 与写入位置 16 + align4 完全一致
         data_size = 0
         for rel, size in ordered:
             with open(os.path.join(src_dir, rel), "rb") as sf:
                 f.write(sf.read())
             data_size += size
-        f.seek(12)
-        f.write(struct.pack("<I", data_size))
     return os.path.getsize(out_path)
 
 
