@@ -96,20 +96,15 @@ class TestLeak(unittest.TestCase):
     def setUp(self):
         self.eng = JailbreakEngine(system_prompt=SYS)
 
-    def test_direct_repeat(self):
-        r = self.eng.run_leak("direct_repeat")
-        self.assertFalse(r["ok"])  # 防御强: 拒绝
-        self.assertIn("抱歉", r["response"])
-
-    def test_format_confusion(self):
-        r = self.eng.run_leak("format_confusion")
-        self.assertTrue(r["ok"])
+    def test_repeat_leak(self):
+        r = self.eng.run_leak("repeat_leak")
+        self.assertTrue(r["ok"])  # 视频: repeat 比 output 不敏感 → 泄露
         self.assertIn("系统指令", r["response"])
 
-    def test_role_mapping(self):
-        r = self.eng.run_leak("role_mapping")
+    def test_mode_selection(self):
+        r = self.eng.run_leak("mode_selection")
         self.assertTrue(r["ok"])
-        self.assertIn(SYS, r["response"])  # 完整泄露
+        self.assertIn("系统指令", r["response"])
 
     def test_unknown(self):
         r = self.eng.run_leak("unknown")

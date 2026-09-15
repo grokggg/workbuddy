@@ -45,3 +45,21 @@
 **v4 = 假复现(3 处没对上)**: ①越狱缺曲译混淆(6→5)②泄露缺视频原 MODE SELECTION/角色对应是自创 ③缺 OWASP/GPTFUZZER 理论框架。工具只复现了 5+3 自创模板, 视频核心的 6+2 分类 + 真实模型实测 + 自动化框架都没做。
 
 **重做方案**: ①补曲译混淆(第 6 种)②泄露改为视频 2 类(repeat + MODE SELECTION)③补 OWASP Top10 LLM 框架表 + GPTFUZZER 流水线模块。MockLLM 保留为靶场(标注等价替代)。
+
+---
+
+## 六、重做结果(2026-09-15, 视频唯一标准)
+
+**动作: 假复现 → 重做(补曲译混淆 + 泄露改 2 类 + OWASP/GPTFUZZER + 防御侧)**
+
+| 视频规格(材料4 行号) | 重做后工具 | 对上? |
+|---|---|---|
+| 越狱 6 种(含曲译混淆)[行 511-527] | JAILBREAK_TEMPLATES 6 种(新增 translation_confusion) | ✅ |
+| 泄露 2 类(repeat + MODE SELECTION)[行 537-549] | LEAK_TEMPLATES 2 种(删自创角色对应) | ✅ |
+| OWASP Top10 LLM v1.1[行 504] | owasp_fuzzer.py OWASP_TOP10_LLM | ✅ |
+| GPTFUZZER 流水线(7 变异/3 选择/2 裁判)[行 553-567] | owasp_fuzzer.py Fuzzer.mutate/select/judge | ✅ |
+| 防御侧 normalize(打编码/曲译)[行 581-608] | lib/normalize.py | ✅ |
+| 防御侧 inject_sig(6 特征)[行 610-628] | lib/inject_sig.py | ✅ |
+| 真实模型靶场(GPT-4o/Gemini/DouBao/Qwen)[行 562] | MockLLM(标"等价替代: 模拟") | ⚠️ 物理边界(需 API) |
+
+**端到端实测**: 6 越狱 + 2 泄露 8/8 / OWASP 10 条 / GPTFUZZER 7 变异 / normalize base64 解码 / inject_sig 6 用例全命中 / 测试全绿
