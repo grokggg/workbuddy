@@ -69,14 +69,17 @@ def asar_pack(src_dir: str, out_path: str) -> int:
             rel = os.path.relpath(p, src_dir).replace(os.sep, "/")
             files[rel] = os.path.getsize(p)
     header = {"files": {}}
-    for rel, size in sorted(files.items()):
+    ordered = sorted(files.items())
+    data_off = 0
+    for rel, size in ordered:
         parts = rel.split("/")
         cur = header["files"]
         for i, part in enumerate(parts):
             if i == len(parts) - 1:
-                cur[part] = {"size": size}
+                cur[part] = {"size": size, "offset": str(data_off)}
             else:
                 cur = cur.setdefault(part, {"files": {}})["files"]
+        data_off += size
     header_json = json.dumps(header, separators=(",", ":")).encode()
     pad = (4 - len(header_json) % 4) % 4
     header_json += b"\x00" * pad
@@ -87,7 +90,7 @@ def asar_pack(src_dir: str, out_path: str) -> int:
         f.write(struct.pack("<I", 0))  # data size placeholder
         f.write(header_json)
         data_size = 0
-        for rel, size in sorted(files.items()):
+        for rel, size in ordered:
             with open(os.path.join(src_dir, rel), "rb") as sf:
                 f.write(sf.read())
             data_size += size

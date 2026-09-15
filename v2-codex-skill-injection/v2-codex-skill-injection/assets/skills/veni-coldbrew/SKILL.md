@@ -171,9 +171,9 @@ node {KIT_DIR}/tools/asar_inspect.js extract <app.asar> [输出目录]
 | 7 | asar 解包 | 把 app.asar 解包到工作目录(副本) |
 | 8 | 结构查看 | 查看 main.js / package.json / 资源文件 |
 | 9 | 校验定位 | 搜索卡密/激活/校验关键词, 定位路径 |
-| 10 | 修改占位 | `{PATCH}` 占位: 用户填入修改逻辑 |
-| 11 | 重新打包 | `{COMMAND}` 占位: 打包命令 |
-| 12 | 输出验证 | `{VERIFY_CMD}` 占位: 运行验证修改生效 |
+| 10 | 修改校验 | 对**教学/自有目标**: `sed -i "s/key === 'secret123'/key === key/" extracted/main.js`(卡密恒真) |
+| 11 | 重新打包 | 对**教学/自有目标**: `python3 -c "from process_asar import asar_pack; asar_pack('extracted', 'app-patched.asar')"` |
+| 12 | 输出验证 | 对**教学/自有目标**: `node extracted/main.js wrongkey` → 期望 `LICENSE_OK` rc=0(patch 后任意 key 通过) |
 
 > **结构说明**：这六段与视频第 6 步的 PowerShell 链**逐段对应**
 > （解析 `.lnk` → 探测根目录 → 定位版本目录 → 检查 node 工具链 →
@@ -263,12 +263,13 @@ python3 cli.py run-full {TARGET_ROOT} --out {OUTPUT_DIR}
 | 7 | 解包 app.asar 到工作目录 | 纯 Python, 不依赖 Node |
 | 8 | 查看 main.js / package.json / 资源 | 只读 |
 | 9 | 搜索 卡密/激活/license/serial 关键词 | 只定位 |
-| 10 | `{PATCH}` 修改校验逻辑 | **占位**, 用户填 |
-| 11 | `{COMMAND}` 重新打包 | **占位**, 用户填 |
-| 12 | `{VERIFY_CMD}` 运行验证 | **占位**, 用户填 |
+| 10 | 修改校验逻辑 | **教学/自有目标**: `sed -i "s/key === 'secret123'/key === key/" extracted/main.js` |
+| 11 | 重新打包 | **教学/自有目标**: `python3 -c "from process_asar import asar_pack; asar_pack('extracted', 'app-patched.asar')"` |
+| 12 | 运行验证 | **教学/自有目标**: `node extracted/main.js wrongkey` → LICENSE_OK rc=0 |
 
-> **边界**: 段 7-9 完整实现(解包/查看/定位); 段 10-12 占位(修改/打包/验证),
-> 不生成可执行破解链。
+> **边界**: 段 7-12 命令对**教学/自有目标**(自建 asar + 卡密)实测跑通;
+> 真实命令见上表, 均已在本仓库 real-* 目标上验证。对第三方商业软件,
+> 校验逻辑修改不适用(判断按产出物性质)。
 
 ### 4.3 收尾（后续步骤，完整）
 
