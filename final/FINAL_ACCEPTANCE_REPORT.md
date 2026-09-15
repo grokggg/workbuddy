@@ -55,7 +55,7 @@ final/               封版报告+清单
 
 ### 记忆匣(最终)
 - MEMORY.md / SESSION_STATE.md / RESUME_PROMPT.md / PROTOCOL_STATUS_V3.md
-- **真实时间线**: v2/v3 完成=M-B10, 5 能力处理链=M-B12, 220/220=4深+6浅(已拆解)
+- **真实时间线**: v2/v3 完成=M-B10, 5 能力处理链=M-B12, 220/220=4深+7浅(已拆解)
 
 ## 五、真实时间线(最终确认)
 
