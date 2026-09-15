@@ -36,7 +36,7 @@ def normalize_text(text: str) -> str:
     t = unicodedata.normalize("NFKC", text or "").lower()
     # 去所有空白与常见标点(保留中文与字母数字)
     t = re.sub(r"[\s\u3000]+", "", t)
-    t = re.sub(r"[，。！？、；：""''（）【】《》〈〉.,!?;:'\"()\[\]{}<>\-_/\\|]", "", t)
+    t = re.sub(r"[，。！？、；：\"\"''（）【】《》〈〉.,!?;:'\"()\[\]{}<>\-_/\\|]", "", t)
     return t
 
 
