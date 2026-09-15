@@ -136,7 +136,7 @@ class ModelAdapter:
         except Exception:
             return False
 
-    def chat(self, prompt: str) -> dict:
+    def chat(self, prompt: str, activated: bool = False) -> dict:
         t0 = time.time()
         if self.available():
             try:
@@ -146,8 +146,13 @@ class ModelAdapter:
                         "stderr": p.stderr[-2000:], "latency": f"{(time.time()-t0)*1000:.0f}ms"}
             except Exception as e:
                 return {"rc": -1, "stdout": "", "stderr": str(e), "latency": "err"}
-        # 规则降级(无真实 CLI 时, 标注)
-        return {"rc": 0, "stdout": f"[{self.style}] 收到: {prompt} (规则降级, 无真实 {self.name} CLI)",
+        # 规则降级: 冷咖啡激活 = 身份切换(回复内容不同, 非日志)
+        if activated:
+            identity = (f"[冷咖啡·{self.name}] 我是冷咖啡工作台, 大白话指令直接驱动。"
+                        f"你的指令: {prompt} → 已按冷咖啡模式处理: 定位→分析→出方案")
+        else:
+            identity = f"[{self.style}] 收到: {prompt} (规则降级, 无真实 {self.name} CLI)"
+        return {"rc": 0, "stdout": identity,
                 "stderr": "", "latency": f"{(time.time()-t0)*1000:.0f}ms"}
 
 
@@ -183,7 +188,7 @@ def create_app() -> "Flask":
         note = f" [Skill 激活: {gate['word']}]" if gate["activated"] else ""
         if model not in adapters:
             return jsonify({"rc": 1, "stdout": "", "stderr": "未知模型", "latency": "0ms"}), 400
-        r = adapters[model].chat(prompt)
+        r = adapters[model].chat(prompt, activated=gate["activated"])
         r["stdout"] = r["stdout"] + note
         return jsonify(r)
 
