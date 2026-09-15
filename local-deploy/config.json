@@ -1,0 +1,25 @@
+{
+  "name": "up-tools-local",
+  "version": "1.0.0",
+  "tools": {
+    "auth_locator": "auth_locator.py",
+    "auth_patcher": "auth_patcher.py",
+    "analysis_all": "analysis_all.py",
+    "lib": ["recon_v2", "analysis_v2", "llm_engine", "patcher", "verifier"]
+  },
+  "dependencies": {
+    "python": "3.10+",
+    "pip_packages": ["capstone", "pyelftools", "pefile"],
+    "optional_system": ["gdb", "objdump", "readelf", "strings", "radare2/rizin"]
+  },
+  "target_examples": [
+    "自建教学 crackme (M26/M38 构造器生成)",
+    "开源项目商业版 (DocuSeal Pro / NocoDB EE, M42 验证)"
+  ],
+  "usage": {
+    "install": "./install.sh",
+    "locate": "python3 auth_locator.py <目标>",
+    "patch_modes": "python3 auth_patcher.py",
+    "analyze": "python3 analysis_all.py <目标> --out <输出目录>"
+  }
+}
