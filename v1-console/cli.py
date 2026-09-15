@@ -75,7 +75,7 @@ def cmd_console(args) -> int:
         print(r["response"])
         print(f"(历史 {r['history_len']} 条)")
         return 0
-    r = con.chat(args.question, args.backend)
+    r = con.chat(args.question, args.backend if not args.auto else None)
     print(f"[{r['backend']}]")
     print(r["response"])
     return 0
@@ -89,6 +89,8 @@ def main(argv=None) -> int:
     c.add_argument("--list-backends", action="store_true")
     c.add_argument("--health", action="store_true")
     c.add_argument("--backend", default=None)
+    c.add_argument("--auto", action="store_true",
+                   help="自动路由(按优先级选后端, 失败回退 mock)")
     c.add_argument("--compare", default=None)
     c.add_argument("--session", default=None)
     c.add_argument("--new-session", action="store_true",
