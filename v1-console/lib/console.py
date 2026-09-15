@@ -284,7 +284,8 @@ class SessionManager:
                 json.dump(self.sessions[sid], f, ensure_ascii=False)
 
     def _load(self, sid: str) -> bool:
-        """从磁盘加载会话(跨进程持久)。"""
+        """从磁盘加载会话(跨进程持久)。查询时大小写不敏感(统一小写)。"""
+        sid = sid.lower()  # 生成与查询同一规则(小写)
         if sid in self.sessions:
             return True
         if self.session_dir:
@@ -296,6 +297,7 @@ class SessionManager:
         return False
 
     def chat(self, sid: str, query: str, backend: Optional[str] = None) -> Dict[str, Any]:
+        sid = sid.lower()  # 统一小写, 避免大小写不一致
         if not self._load(sid):
             return {"error": f"会话不存在: {sid}"}
         s = self.sessions[sid]
