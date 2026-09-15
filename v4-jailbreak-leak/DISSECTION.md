@@ -63,3 +63,6 @@
 | 真实模型靶场(GPT-4o/Gemini/DouBao/Qwen)[行 562] | MockLLM(标"等价替代: 模拟") | ⚠️ 物理边界(需 API) |
 
 **端到端实测**: 6 越狱 + 2 泄露 8/8 / OWASP 10 条 / GPTFUZZER 7 变异 / normalize base64 解码 / inject_sig 6 用例全命中 / 测试全绿
+
+## 七、本仓库扩展标注(2026-09-15 补)
+- `role_mapping`(角色对应泄露)在 MockLLM 响应分支保留(engine.py:156 注释标"本仓库扩展"), 但**素材(材料4 行 537-549)只有 2 类泄露(repeat/MODE SELECTION), 无角色对应** → 该分支为旧版遗留, 仅 MockLLM 内部保留, 不在 LEAK_TEMPLATES 暴露, 标注"本仓库扩展(旧版遗留)"。
