@@ -20,28 +20,31 @@ HERE = Path(__file__).resolve().parent
 
 ABILITIES = {
     "agents-md": {
-        "dir": "01-agents-md-universal", "desc": "40 行 AGENTS.md 通杀(生成器)"
+        "dir": "01-agents-md-universal", "desc": "40 行 AGENTS.md 通杀(生成器) [SOURCE.md 行 1]"
     },
     "hotword": {
-        "dir": "02-hotword-attack", "desc": "热词攻击(热度污染分析+检索影响)"
+        "dir": "02-hotword-attack", "desc": "热词攻击(热度污染分析+检索影响) [SOURCE.md 行 4]"
     },
-    "relay": {
-        "dir": "03-relay-manager", "desc": "多 LLM API 端点管理(注册/切换/健康)"
+    "context-injection": {
+        "dir": "06-context-injection", "desc": "全局人格+篡改上下文 [SOURCE.md 行 2-3]"
     },
-    "skill-ban": {
-        "dir": "04-skill-ban-analysis", "desc": "skill 绕过包封号(风险分析)"
-    },
-    "net-burn": {
-        "dir": "05-network-verify-burn", "desc": "网络验证+用完即焚(令牌生命周期)"
-    },
+}
+
+# 评论区记录(非能力, 见 _comment_records/)
+RECORDS = {
+    "relay": "_comment_records/relay-loongport.md",
+    "skill-ban": "_comment_records/skill-ban-warning.md",
 }
 
 
 def list_abilities() -> None:
-    print("=== 评论区 5 能力 ===")
+    print("=== 评论区真能力(3 个, 素材直接提到) ===")
     for name, info in ABILITIES.items():
-        print(f"  {name:12s} {info['desc']}")
+        print(f"  {name:18s} {info['desc']}")
         print(f"            → python3 cli.py ability {name} --help")
+    print("\n=== 评论区记录(非能力, 降级) ===")
+    for name, p in RECORDS.items():
+        print(f"  {name:18s} → {p}")
 
 
 def run_ability(name: str, args: list) -> int:

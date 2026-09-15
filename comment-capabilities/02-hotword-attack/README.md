@@ -61,3 +61,6 @@ def load_hotwords(source=None) -> dict:
 - 与 01-agents-md-universal 同结构(engine.py + tests/test_engine.py + cli.py + install.sh + README.md)
 - 检索影响评估的输出可被下游拿来: 检测"热词堆砌"文档在检索结果中的不当上升(pollution_ratio 阈值告警), 或作为 LLM 检索上下文的前置筛查信号
 - 自定义词表可通过 `--hotwords`/`hotwords=` 注入, 便于按领域扩展分类
+
+## 素材出处
+评论区 SOURCE.md 行 4: 「热词攻击，网络上创造一个话题热度...词汇泄露」

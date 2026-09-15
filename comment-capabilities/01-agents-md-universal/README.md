@@ -39,3 +39,6 @@ python3 tests/test_engine.py -v
 ## 八、集成说明
 - 与 v2 注入包同思路(SKILL.md → AGENTS.md)
 - 可配合 skill-injection-kit 的多框架路径表
+
+## 素材出处
+评论区 SOURCE.md 行 1: 「40行的AGENTS.md就够用了。claude和gpt通杀（sonnet5不行）」

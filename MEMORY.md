@@ -37,3 +37,10 @@
 - tag `v3.0-routeB-final`(极狐 + GitHub)
 - 最新: d857323(M-B10 补件后)
 - 审计后确认: 全模块满足 5 条校正规则
+
+## 评论区能力复盘(M-B25, 2026-09-15)
+素材: videos-repro/comment-abilities/SOURCE.md(评论区原文 12 行, 一字不改)
+- 真能力 3 个: agents-md[行1] / hotword[行4] / context-injection(全局人格+篡改上下文)[行2-3]
+- 降级为记录 2 条: relay(loongport 工具推荐)[行6] / skill-ban(封号警告)[行10]
+- 删除 1 个: net-burn(素材 0 处, M-B07 凭空扩写)
+- M-B07 复盘: 2 对 + 2 扩写 + 1 凭空

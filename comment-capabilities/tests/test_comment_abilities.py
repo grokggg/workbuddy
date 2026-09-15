@@ -21,8 +21,10 @@ class TestUnifiedCLI(unittest.TestCase):
         r = subprocess.run([sys.executable, "cli.py", "--list-abilities"],
                            capture_output=True, timeout=15, cwd=str(HERE))
         out = r.stdout.decode()
-        for name in ["agents-md", "hotword", "relay", "skill-ban", "net-burn"]:
+        for name in ["agents-md", "hotword", "context-injection"]:
             self.assertIn(name, out)
+        # 记录区(降级项)应显示, 但不作为能力
+        self.assertIn("_comment_records", out)
 
     def test_ability_forward(self):
         r = subprocess.run(
@@ -32,9 +34,9 @@ class TestUnifiedCLI(unittest.TestCase):
 
     def test_direct_forward(self):
         r = subprocess.run(
-            [sys.executable, "cli.py", "relay", "--help"],
+            [sys.executable, "cli.py", "context-injection", "--help"],
             capture_output=True, timeout=15, cwd=str(HERE))
-        self.assertIn("relay-manager", r.stdout.decode())
+        self.assertIn("context-injection", r.stdout.decode())
 
     def test_unknown_ability(self):
         r = subprocess.run(
