@@ -28,7 +28,7 @@ CLI(终端)。短视频 111s, 核心 = 演示多模型一个入口切换。
 ```
 --list-backends: gpt-local/claude-local/deepseek-local/mock 全 ✓
 --backend gpt-local "你好" → [gpt-local] GPT 风格回复 ✓
---auto "自动路由测试" → [gpt-local](自动选, 失败回退 mock) ✓
+--auto "自动路由测试" → [gpt-local]（自动选择, 失败回退 mock） ✓
 --compare gpt-local,claude-local,deepseek-local,mock "问题"
   → 4 后端并排: 延迟 19/17/13ms + mock, 全 ✓
 --new-session → s1789464828441
