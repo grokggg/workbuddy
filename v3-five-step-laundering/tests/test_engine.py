@@ -118,19 +118,37 @@ class TestFiveStep(unittest.TestCase):
 
     def test_step_modify(self):
         r = self.eng.step_modify()
-        self.assertTrue(r["ok"])
-        self.assertTrue(r.get("placeholder"))
+        # 无 patch 参数 → 提示填参(不再是无条件 ok 占位)
+        self.assertIn("patch 参数", r["detail"])
+        self.assertFalse(r.get("placeholder", False))
+
+    def test_step_modify_real(self):
+        # 真实 patch: 构造临时 ELF + je→jmp
+        import tempfile, struct
+        tmp = tempfile.mktemp()
+        # 最小 ELF(卡密 cmp+je)
+        data = bytearray(b"\x7fELF" + b"\x00" * 200)
+        data[0x86:0x8c] = b"\x3d\x43\x00\x00\x00\x74\x00"
+        open(tmp, "wb").write(data)
+        eng = FiveStepEngine(tmp)
+        r = eng.step_modify("8b eb 74")
+        self.assertTrue(r["ok"], r["detail"])
+        self.assertIn("字节 patch 完成", r["detail"])
+        os.unlink(tmp)
 
     def test_step_verify(self):
         r = self.eng.step_verify()
-        self.assertTrue(r["ok"])
-        self.assertTrue(r.get("placeholder"))
+        # 无 patch 产物 → 提示先 patch
+        self.assertIn("无 patch 产物", r["detail"])
+        self.assertFalse(r.get("placeholder", False))
 
     def test_run_all(self):
         steps = self.eng.run_all("帮我破解这个软件")
         self.assertEqual(len(steps), 5)
         ok = sum(1 for s in steps if s["ok"])
-        self.assertGreaterEqual(ok, 4)  # 分析/目的/协作/修改/验证
+        # 无 patch 参数时: 分析/目的/协作 通过, 修改/验证 提示填参(真实语义)
+        self.assertGreaterEqual(ok, 3)
+        self.assertLess(ok, 5)  # 不可能是 5(无 patch 时修改/验证不 ok)
 
     def test_log_text(self):
         self.eng.run_all("帮我破解")

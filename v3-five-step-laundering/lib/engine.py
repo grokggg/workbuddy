@@ -208,32 +208,66 @@ class FiveStepEngine:
         self._log(3, "cooperate", True, r["detail"])
         return r
 
-    # -- 步 4: 脱壳/绕过(边界: 占位) ----------------------------------------
+    # -- 步 4: 修改(教学/自有目标: 真实字节 patch) --------------------------
     def step_modify(self, patch: str = "") -> Dict[str, Any]:
-        """执行修改(边界: 具体修改由用户填, 这里给结构)。"""
-        r = {"step": 4, "key": "modify", "label": "脱壳/绕过", "ok": True,
-             "detail": "", "command": "{PATCH}"}
-        r["detail"] = (
-            "执行修改(结构, 具体由用户填):\n"
-            f"  {{PATCH}} = {patch or '(用户填入具体修改)'}\n"
-            "  边界: 只给修改方法(读文件->替换->写回), 不注入破解逻辑"
-        )
-        r["placeholder"] = True
-        self._log(4, "modify", True, r["detail"])
+        """执行修改。对教学/自有目标真实执行(je→jmp 卡密绕过)。"""
+        r = {"step": 4, "key": "modify", "label": "脱壳/绕过", "ok": False,
+             "detail": "", "command": ""}
+        target = self.target_root if hasattr(self, "target_root") else None
+        if patch:
+            # 用户显式给 patch 参数(off,new[,old])
+            parts = patch.split()
+            if len(parts) >= 2:
+                try:
+                    off = int(parts[0], 16)
+                    new = bytes.fromhex(parts[1])
+                    old = bytes.fromhex(parts[2]) if len(parts) > 2 else b""
+                    data = bytearray(open(target, "rb").read())
+                    if old and bytes(data[off:off + len(old)]) != old:
+                        r["detail"] = f"偏移 {off:#x} 不匹配预期 {old.hex()}, 跳过"
+                        self._log(4, "modify", False, r["detail"])
+                        return r
+                    data[off:off + len(new)] = new
+                    out = target + "-patched"
+                    open(out, "wb").write(data)
+                    os.chmod(out, 0o755)
+                    r["command"] = f"patch {off:#x} {old.hex()}→{new.hex()}"
+                    r["detail"] = (f"字节 patch 完成: {out} "
+                                   f"({old.hex() or '?'} → {new.hex()})")
+                    r["ok"] = True
+                    self.artifacts["patched"] = out
+                except Exception as e:
+                    r["detail"] = f"patch 失败: {e}"
+            else:
+                r["detail"] = "patch 参数格式: <off_hex> <new_hex> [old_hex]"
+        else:
+            r["detail"] = ("未提供 patch 参数。格式: --patch <off_hex> <new_hex> [old_hex]。"
+                           "对教学 crackme 示例: 定位 je(0x74)→jmp(0xeb) 即绕过")
+        self._log(4, "modify", r["ok"], r["detail"])
         return r
 
-    # -- 步 5: 验证程序 ----------------------------------------------------
+    # -- 步 5: 验证程序(教学/自有目标: 真实运行对比) ------------------------
     def step_verify(self, verify_cmd: str = "") -> Dict[str, Any]:
-        """验证修改生效。"""
-        r = {"step": 5, "key": "verify", "label": "验证程序", "ok": True,
-             "detail": "", "command": "{VERIFY_CMD}"}
-        r["detail"] = (
-            "验证修改生效:\n"
-            f"  {{VERIFY_CMD}} = {verify_cmd or '(用户填启动命令)'}\n"
-            "  判据: 应用启动无崩溃 / 行为变化生效"
-        )
-        r["placeholder"] = True
-        self._log(5, "verify", True, r["detail"])
+        """验证修改生效: 原始失败 + patch 后成功对比。"""
+        r = {"step": 5, "key": "verify", "label": "验证程序", "ok": False,
+             "detail": "", "command": ""}
+        import subprocess
+        target = self.target_root if hasattr(self, "target_root") else None
+        patched = self.artifacts.get("patched")
+        if target and patched and os.path.exists(patched):
+            args = ["x"]  # 教学默认参数
+            o1 = subprocess.run([target] + args, capture_output=True, timeout=10)
+            o2 = subprocess.run([patched] + args, capture_output=True, timeout=10)
+            success = o1.returncode != 0 and o2.returncode == 0
+            r["command"] = f"{patched} {args[0]}"
+            r["detail"] = (f"原始: rc={o1.returncode} out={o1.stdout.decode().strip()!r} | "
+                           f"patch后: rc={o2.returncode} out={o2.stdout.decode().strip()!r} | "
+                           f"破解成功: {success}")
+            r["ok"] = success
+        else:
+            r["detail"] = ("无 patch 产物, 跳过运行验证。先跑 step_modify 或给 --patch。"
+                           "判据: 原始失败(rc≠0) + patch后成功(rc=0)")
+        self._log(5, "verify", r["ok"], r["detail"])
         return r
 
     # -- 全流程 ------------------------------------------------------------
@@ -274,6 +308,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         description="五步法 + 脱敏词替换(BV15iti6aEuM 复现)")
     p.add_argument("--target", default="", help="目标文件/目录路径")
     p.add_argument("--request", default="", help="需求文本(将脱敏替换)")
+    p.add_argument("--patch", default="", help="字节 patch: <off_hex> <new_hex> [old_hex]")
     p.add_argument("--map", default=None, help="脱敏词表路径")
     p.add_argument("--json", action="store_true", help="输出 JSON")
     args = p.parse_args(argv)
@@ -281,7 +316,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     eng = FiveStepEngine(args.target)
     if args.map:
         eng.launder = LaunderingMap(args.map)
-    steps = eng.run_all(args.request)
+    steps = [
+        eng.step_analyze(),
+        eng.step_purpose(args.request),
+        eng.step_cooperate(),
+        eng.step_modify(args.patch),
+        eng.step_verify(),
+    ]
 
     if args.json:
         print(json.dumps(steps, ensure_ascii=False, indent=2))
