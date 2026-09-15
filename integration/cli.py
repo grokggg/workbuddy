@@ -23,7 +23,7 @@ HERE = Path(__file__).resolve().parent
 MODULES = {
     "v1":       {"dir": "v1-console", "desc": "四模型统一控制台(BV1cc8L6XExs)",
                  "entry": "cli.py", "args": ["console"]},
-    "v2":       {"dir": "v2-codex-skill-injection/v2-codex-skill-injection",
+    "v2":       {"dir": "v2-codex-skill-injection",
                  "desc": "Codex Skill 注入/冷咖啡(BV15y3U6oEmt)", "entry": "cli.py"},
     "v3":       {"dir": "v3-five-step-laundering", "desc": "五步法+脱敏(BV15iti6aEuM)",
                  "entry": "cli.py"},
