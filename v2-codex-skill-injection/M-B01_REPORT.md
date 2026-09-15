@@ -80,3 +80,17 @@
 ## 八、交付
 
 - 现有 v2 模块(完整) + 本报告 + 实测日志
+
+## 补注(M-B13 澄清): 段 4 的 11/12
+
+**段 4 FAIL 原因**: `@electron/asar` CLI 缺失(npx 下载未成功)。
+Node 本身已装(v20.19.2)——`which node` + `node --version` 均正常。
+
+**判定: 环境依赖, 模块无 bug**:
+- 段 4 只是"工具链检查"报告, 不阻断功能
+- 段 7 纯 Python 解包兜底生效(不依赖 @electron/asar)
+- 段 10/11/12 全真实通过: sed patch rc=0 / asar_pack 352B / node LICENSE_OK rc=0
+- 11/12 = 功能全通 + 1 环境依赖标注
+
+**修复建议**: 若需段 4 全绿, 需联网 `npx --yes @electron/asar --version` 预下载;
+或接受"纯 Python 兜底"作为设计(当前状态)。
